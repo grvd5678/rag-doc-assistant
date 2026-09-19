@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import axios from 'axios';
 import { Send, Bot, User, Loader2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 
 export default function ChatBox({ onQueryResult, activeDocument }) {
   const [question, setQuestion] = useState('');
@@ -17,7 +18,7 @@ export default function ChatBox({ onQueryResult, activeDocument }) {
     setLoading(true);
 
     try {
-      const response = await axios.post('http://127.0.0.1:8000/query', {
+      const response = await axios.post('/query', {
         question: userQuery,
       });
 
@@ -31,7 +32,7 @@ export default function ChatBox({ onQueryResult, activeDocument }) {
       if (onQueryResult) {
         onQueryResult(sources);
       }
-    } catch  {
+    } catch {
       setChatHistory((prev) => [
         ...prev,
         {
@@ -75,17 +76,55 @@ export default function ChatBox({ onQueryResult, activeDocument }) {
                   msg.role === 'user' ? 'bg-indigo-600' : 'bg-slate-700'
                 }`}
               >
-                {msg.role === 'user' ? <User className="w-5 h-5 text-white" /> : <Bot className="w-5 h-5 text-indigo-400" />}
+                {msg.role === 'user' ? (
+                  <User className="w-5 h-5 text-white" />
+                ) : (
+                  <Bot className="w-5 h-5 text-indigo-400" />
+                )}
               </div>
 
               <div
-                className={`max-w-[80%] p-3.5 rounded-xl text-sm leading-relaxed ${
+                className={`max-w-[85%] p-3.5 rounded-xl text-sm leading-relaxed ${
                   msg.role === 'user'
                     ? 'bg-indigo-600 text-white rounded-tr-none'
-                    : 'bg-slate-900 border border-slate-700 text-slate-200 rounded-tl-none whitespace-pre-wrap'
+                    : 'bg-slate-900 border border-slate-700 text-slate-200 rounded-tl-none'
                 }`}
               >
-                {msg.content}
+                {msg.role === 'user' ? (
+                  <div className="whitespace-pre-wrap">{msg.content}</div>
+                ) : (
+                  <div className="prose prose-invert max-w-none text-slate-200 text-sm leading-relaxed">
+                    <ReactMarkdown
+                      components={{
+                        p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} />,
+                        ul: ({ node, ...props }) => (
+                          <ul className="list-disc pl-5 mb-2 space-y-1 text-slate-300" {...props} />
+                        ),
+                        ol: ({ node, ...props }) => (
+                          <ol className="list-decimal pl-5 mb-2 space-y-1 text-slate-300" {...props} />
+                        ),
+                        li: ({ node, ...props }) => <li className="text-slate-200" {...props} />,
+                        strong: ({ node, ...props }) => (
+                          <strong className="font-semibold text-indigo-300" {...props} />
+                        ),
+                        code: ({ node, ...props }) => (
+                          <code
+                            className="bg-slate-800 text-indigo-300 px-1.5 py-0.5 rounded font-mono text-xs"
+                            {...props}
+                          />
+                        ),
+                        pre: ({ node, ...props }) => (
+                          <pre
+                            className="bg-slate-950 p-3 rounded-lg overflow-x-auto text-xs font-mono border border-slate-800 my-2"
+                            {...props}
+                          />
+                        ),
+                      }}
+                    >
+                      {msg.content}
+                    </ReactMarkdown>
+                  </div>
+                )}
               </div>
             </div>
           ))

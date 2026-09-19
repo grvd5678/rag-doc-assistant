@@ -1,0 +1,26 @@
+# Environment variables & API keys (CRITICAL - Keep private!)
+.env
+*.env
+
+# Virtual Environments
+venv/
+.venv/
+.venv-1/
+
+# Node modules & frontend builds
+node_modules/
+dist/
+build/
+
+# Uploaded PDF files
+uploaded_files/
+
+# Python cache & compiled files
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.swp
