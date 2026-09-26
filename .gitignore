@@ -1,24 +1,35 @@
 # Environment variables & API keys (CRITICAL - Keep private!)
 .env
 *.env
+**/.env
+**/*.env
 
 # Virtual Environments
 venv/
 .venv/
 .venv-1/
+backend/venv/
+backend/.venv/
+backend/.venv-1/
 
 # Node modules & frontend builds
 node_modules/
 dist/
 build/
+frontend/dist/
+frontend/node_modules/
 
-# Uploaded PDF files
+# Uploaded PDF files & Vector Storage
 uploaded_files/
+backend/uploaded_files/
+chroma_db/
+backend/chroma_db/
 
 # Python cache & compiled files
 __pycache__/
 *.pyc
 *.pyo
+backend/**/__pycache__/
 
 # IDE & Editor files
 .vscode/

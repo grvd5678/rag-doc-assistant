@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/upload",
+      "destination": "http://16.171.113.90/upload"
+    },
+    {
+      "source": "/query",
+      "destination": "http://16.171.113.90/query"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
