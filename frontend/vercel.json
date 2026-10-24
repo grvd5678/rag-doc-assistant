@@ -2,11 +2,11 @@
   "rewrites": [
     {
       "source": "/upload",
-      "destination": "http://16.171.113.90/upload"
+      "destination": "http://13.60.60.47/upload"
     },
     {
       "source": "/query",
-      "destination": "http://16.171.113.90/query"
+      "destination": "http://13.60.60.47/query"
     },
     {
       "source": "/(.*)",
