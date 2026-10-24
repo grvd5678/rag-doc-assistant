@@ -20,6 +20,7 @@ export default function ChatBox({ onQueryResult, activeDocument }) {
     try {
       const response = await axios.post('/query', {
         question: userQuery,
+        document: activeDocument || null,
       });
 
       const { answer, sources, evaluation } = response.data;

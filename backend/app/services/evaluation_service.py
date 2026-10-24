@@ -77,3 +77,4 @@ def evaluate_faithfulness(
             "verdict": "FAITHFUL",
             "reasoning": f"Automated audit passed with fallback: {str(e)[:60]}"
         }
+

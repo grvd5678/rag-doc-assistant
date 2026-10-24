@@ -1,5 +1,6 @@
 import os
 import time
+from typing import Optional
 from fastapi import UploadFile, HTTPException
 from pypdf import PdfReader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -85,24 +86,32 @@ def process_pdf_file(file: UploadFile) -> int:
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     chunks = text_splitter.split_documents(documents)
     
-    # Store into Chroma vector store with persistent storage
     vector_store = get_vector_store()
+    
+    # Clean out any old version of this exact document before adding new chunks
+    try:
+        existing = vector_store._collection.get(where={"source": file.filename})
+        if existing and existing.get("ids"):
+            vector_store._collection.delete(ids=existing["ids"])
+    except Exception:
+        pass
+
     vector_store.add_documents(chunks)
     
-    # Rebuild BM25 sparse index and clear query response cache for new doc
+    # Rebuild BM25 index
     _refresh_bm25_index()
     clear_cache()
     
     return len(chunks)
 
-def query_rag_engine(query: str):
+def query_rag_engine(query: str, document_filter: Optional[str] = None):
     global _bm25_retriever
     start_time = time.time()
     
     # ========================================================
     # 🎯 UPGRADE 3: Semantic & Exact Cache Check (<50ms)
     # ========================================================
-    cached_result = get_cached_response(query)
+    cached_result = get_cached_response(query, doc_filter=document_filter)
     if cached_result:
         latency_ms = round((time.time() - start_time) * 1000, 2)
         return {
@@ -137,28 +146,30 @@ def query_rag_engine(query: str):
             }
         
         # ========================================================
-        # 🎯 UPGRADE 1: Hybrid Retrieval (Dense Vector + BM25 Sparse + RRF)
+        # 🎯 UPGRADE 1: Hybrid Retrieval with Document-Level Scoping
         # ========================================================
-        # 1. Dense retrieval via ChromaDB
-        dense_docs = vector_store.similarity_search(query, k=8)
+        # 1. Dense retrieval via ChromaDB with optional metadata filter
+        where_clause = {"source": document_filter} if document_filter else None
+        dense_docs = vector_store.similarity_search(query, k=8, filter=where_clause)
         
-        # 2. Sparse retrieval via BM25Okapi
+        # 2. Sparse retrieval via BM25Okapi with document_filter
         if _bm25_retriever is None:
             _refresh_bm25_index()
             
-        sparse_docs = _bm25_retriever.search(query, top_k=8) if _bm25_retriever else []
+        sparse_docs = _bm25_retriever.search(query, top_k=8, document_filter=document_filter) if _bm25_retriever else []
         
         # 3. Reciprocal Rank Fusion (RRF) Re-ranking
         if sparse_docs:
             top_docs = reciprocal_rank_fusion(dense_docs, sparse_docs, k=60, top_n=4)
-            retrieval_method = "Hybrid (BM25 + ChromaDB RRF)"
+            retrieval_method = f"Hybrid (BM25 + ChromaDB RRF){f' [{document_filter}]' if document_filter else ''}"
         else:
             top_docs = dense_docs[:4]
-            retrieval_method = "Dense Vector Search (ChromaDB)"
+            retrieval_method = f"Dense Vector Search{f' [{document_filter}]' if document_filter else ''}"
 
         if not top_docs:
+            doc_msg = f" in '{document_filter}'" if document_filter else ""
             return {
-                "answer": "No relevant content found in the uploaded documents for your query.",
+                "answer": f"No relevant content found{doc_msg} for your query.",
                 "sources": [],
                 "evaluation": None
             }
@@ -182,9 +193,11 @@ def query_rag_engine(query: str):
             google_api_key=api_key
         )
         
+        system_scope = f" Answer strictly based on the document '{document_filter}'." if document_filter else ""
         prompt = ChatPromptTemplate.from_messages([
-            ("system", "You are DocuMind AI, an intelligent, reliable document assistant. "
+            ("system", f"You are DocuMind AI, an intelligent, reliable document assistant.{system_scope} "
                        "Answer the user's question concisely, clearly, and accurately based ONLY on the provided context below. "
+                       "Do NOT mention or hallucinate details from other documents. "
                        "Use formatted markdown with bolding, lists, or code blocks where appropriate for clarity. "
                        "If the information is not present in the context, politely state that you cannot find it in the uploaded document.\n\n"
                        "Context from PDF documents:\n{context}"),
@@ -216,11 +229,12 @@ def query_rag_engine(query: str):
             "cached": False
         }
 
-        # Cache the validated response for future identical queries
+        # Cache the validated response for future identical queries with document scoping
         set_cached_response(
             query=query,
             answer=response_text,
             sources=sources,
+            doc_filter=document_filter,
             faithfulness_score=eval_result["score"],
             grounded_verdict=eval_result["verdict"],
             latency_ms=latency_ms

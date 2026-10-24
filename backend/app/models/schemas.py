@@ -3,6 +3,7 @@ from typing import List, Optional
 
 class QueryRequest(BaseModel):
     question: str
+    document: Optional[str] = None  # If provided, filters retrieval strictly to this document
 
 class SourceItem(BaseModel):
     page: int
@@ -24,3 +25,4 @@ class QueryResponse(BaseModel):
 
 class UploadResponse(BaseModel):
     message: str
+    document: Optional[str] = None

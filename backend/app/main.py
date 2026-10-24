@@ -28,7 +28,10 @@ async def upload_document(file: UploadFile = File(...)):
     
     try:
         num_chunks = process_pdf_file(file)
-        return {"message": f"Successfully processed '{file.filename}' into {num_chunks} chunks!"}
+        return {
+            "message": f"Successfully processed '{file.filename}' into {num_chunks} chunks!",
+            "document": file.filename
+        }
     except Exception as e:
         print(f"Upload Error: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -39,7 +42,7 @@ async def query_document(request: QueryRequest):
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
     
     try:
-        response = query_rag_engine(request.question)
+        response = query_rag_engine(request.question, document_filter=request.document)
         return response
     except Exception as e:
         print(f"Query Error: {traceback.format_exc()}")

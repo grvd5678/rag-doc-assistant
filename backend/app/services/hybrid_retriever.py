@@ -1,5 +1,5 @@
 import re
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 from rank_bm25 import BM25Okapi
 from langchain_core.documents import Document
 
@@ -21,7 +21,6 @@ def reciprocal_rank_fusion(
     doc_map: Dict[str, Document] = {}
 
     def get_doc_id(doc: Document) -> str:
-        # Unique doc id based on source, page, and chunk content prefix
         src = doc.metadata.get("source", "doc")
         page = doc.metadata.get("page", 1)
         prefix = doc.page_content[:40]
@@ -50,13 +49,23 @@ class BM25Retriever:
         self.corpus = [tokenize(doc.page_content) for doc in documents]
         self.bm25 = BM25Okapi(self.corpus) if self.corpus else None
 
-    def search(self, query: str, top_k: int = 10) -> List[Document]:
+    def search(self, query: str, top_k: int = 10, document_filter: Optional[str] = None) -> List[Document]:
         if not self.bm25 or not self.documents:
             return []
         tokens = tokenize(query)
         if not tokens:
             return []
         scores = self.bm25.get_scores(tokens)
-        top_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:top_k]
-        # Return only documents with a positive BM25 score
-        return [self.documents[i] for i in top_indices if scores[i] > 0]
+        
+        # Filter by document_filter if specified
+        valid_indices = []
+        for i, doc in enumerate(self.documents):
+            if document_filter:
+                doc_src = doc.metadata.get("source")
+                if doc_src != document_filter:
+                    continue
+            if scores[i] > 0:
+                valid_indices.append(i)
+                
+        top_indices = sorted(valid_indices, key=lambda i: scores[i], reverse=True)[:top_k]
+        return [self.documents[i] for i in top_indices]
