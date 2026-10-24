@@ -9,13 +9,13 @@ CACHE_DB_PATH = os.path.abspath(
 )
 
 def init_cache():
-    """Initializes the SQLite cache table if it doesn't already exist."""
+    """Initializes the SQLite cache table if it doesn't already exist and handles schema migration."""
     conn = sqlite3.connect(CACHE_DB_PATH)
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS semantic_cache (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            doc_filter TEXT,
+            doc_filter TEXT DEFAULT '__all__',
             query_normalized TEXT NOT NULL,
             answer TEXT NOT NULL,
             sources TEXT NOT NULL,
@@ -25,6 +25,14 @@ def init_cache():
             created_at REAL
         )
     """)
+    # Check if doc_filter column exists in legacy tables
+    cursor.execute("PRAGMA table_info(semantic_cache)")
+    columns = [col[1] for col in cursor.fetchall()]
+    if "doc_filter" not in columns:
+        try:
+            cursor.execute("ALTER TABLE semantic_cache ADD COLUMN doc_filter TEXT DEFAULT '__all__'")
+        except Exception:
+            pass
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_query ON semantic_cache(doc_filter, query_normalized)")
     conn.commit()
     conn.close()
@@ -37,31 +45,34 @@ def normalize_query(query: str) -> str:
 
 def get_cached_response(query: str, doc_filter: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """Checks the cache for an exact normalized match scoped to the document filter."""
-    norm = normalize_query(query)
-    filter_val = doc_filter or "__all__"
-    conn = sqlite3.connect(CACHE_DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-        SELECT answer, sources, faithfulness_score, grounded_verdict 
-        FROM semantic_cache 
-        WHERE doc_filter = ? AND query_normalized = ? 
-        ORDER BY id DESC LIMIT 1
-        """,
-        (filter_val, norm)
-    )
-    row = cursor.fetchone()
-    conn.close()
-    
-    if row:
-        return {
-            "answer": row[0],
-            "sources": json.loads(row[1]),
-            "faithfulness_score": row[2],
-            "grounded_verdict": row[3],
-            "cached": True
-        }
-    return None
+    try:
+        norm = normalize_query(query)
+        filter_val = doc_filter or "__all__"
+        conn = sqlite3.connect(CACHE_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT answer, sources, faithfulness_score, grounded_verdict 
+            FROM semantic_cache 
+            WHERE doc_filter = ? AND query_normalized = ? 
+            ORDER BY id DESC LIMIT 1
+            """,
+            (filter_val, norm)
+        )
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row:
+            return {
+                "answer": row[0],
+                "sources": json.loads(row[1]),
+                "faithfulness_score": row[2],
+                "grounded_verdict": row[3],
+                "cached": True
+            }
+        return None
+    except Exception:
+        return None
 
 def set_cached_response(
     query: str,
@@ -73,34 +84,40 @@ def set_cached_response(
     latency_ms: Optional[float] = None
 ):
     """Caches query answer and evaluation metadata scoped to doc filter."""
-    norm = normalize_query(query)
-    filter_val = doc_filter or "__all__"
-    conn = sqlite3.connect(CACHE_DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-        INSERT INTO semantic_cache (
-            doc_filter, query_normalized, answer, sources, faithfulness_score, grounded_verdict, latency_ms, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            filter_val,
-            norm,
-            answer,
-            json.dumps(sources),
-            faithfulness_score,
-            grounded_verdict,
-            latency_ms,
-            time.time()
+    try:
+        norm = normalize_query(query)
+        filter_val = doc_filter or "__all__"
+        conn = sqlite3.connect(CACHE_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO semantic_cache (
+                doc_filter, query_normalized, answer, sources, faithfulness_score, grounded_verdict, latency_ms, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                filter_val,
+                norm,
+                answer,
+                json.dumps(sources),
+                faithfulness_score,
+                grounded_verdict,
+                latency_ms,
+                time.time()
+            )
         )
-    )
-    conn.commit()
-    conn.close()
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
 
 def clear_cache():
     """Clears the cache."""
-    conn = sqlite3.connect(CACHE_DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM semantic_cache")
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(CACHE_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM semantic_cache")
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
