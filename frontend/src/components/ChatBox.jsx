@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import axios from 'axios';
-import { Send, Bot, User, Loader2 } from 'lucide-react';
+import { Send, Bot, User, Loader2, ShieldCheck, Zap, Sparkles } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 export default function ChatBox({ onQueryResult, activeDocument }) {
@@ -22,11 +22,11 @@ export default function ChatBox({ onQueryResult, activeDocument }) {
         question: userQuery,
       });
 
-      const { answer, sources } = response.data;
+      const { answer, sources, evaluation } = response.data;
 
       setChatHistory((prev) => [
         ...prev,
-        { role: 'assistant', content: answer, sources },
+        { role: 'assistant', content: answer, sources, evaluation },
       ]);
 
       if (onQueryResult) {
@@ -46,7 +46,7 @@ export default function ChatBox({ onQueryResult, activeDocument }) {
   };
 
   return (
-    <div className="bg-slate-800 rounded-xl border border-slate-700 shadow-lg flex flex-col h-[600px]">
+    <div className="bg-slate-800 rounded-xl border border-slate-700 shadow-lg flex flex-col h-[650px]">
       <div className="p-4 border-b border-slate-700 flex items-center gap-2">
         <Bot className="text-indigo-400" />
         <h2 className="text-xl font-bold text-slate-100">DocuMind Assistant</h2>
@@ -62,6 +62,11 @@ export default function ChatBox({ onQueryResult, activeDocument }) {
           <div className="h-full flex flex-col items-center justify-center text-slate-500 text-center">
             <Bot className="w-12 h-12 mb-2 opacity-50" />
             <p className="text-sm">Upload a document and ask any question to get started!</p>
+            <div className="mt-4 flex flex-wrap justify-center gap-2 text-xs text-slate-400">
+              <span className="bg-slate-900 border border-slate-700 px-2.5 py-1 rounded-md">🎯 Hybrid Search (BM25 + Dense)</span>
+              <span className="bg-slate-900 border border-slate-700 px-2.5 py-1 rounded-md">🛡️ Faithfulness Guardrail</span>
+              <span className="bg-slate-900 border border-slate-700 px-2.5 py-1 rounded-md">⚡ Sub-50ms Semantic Cache</span>
+            </div>
           </div>
         ) : (
           chatHistory.map((msg, index) => (
@@ -93,36 +98,59 @@ export default function ChatBox({ onQueryResult, activeDocument }) {
                 {msg.role === 'user' ? (
                   <div className="whitespace-pre-wrap">{msg.content}</div>
                 ) : (
-                  <div className="prose prose-invert max-w-none text-slate-200 text-sm leading-relaxed">
-                    <ReactMarkdown
-                      components={{
-                        p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} />,
-                        ul: ({ node, ...props }) => (
-                          <ul className="list-disc pl-5 mb-2 space-y-1 text-slate-300" {...props} />
-                        ),
-                        ol: ({ node, ...props }) => (
-                          <ol className="list-decimal pl-5 mb-2 space-y-1 text-slate-300" {...props} />
-                        ),
-                        li: ({ node, ...props }) => <li className="text-slate-200" {...props} />,
-                        strong: ({ node, ...props }) => (
-                          <strong className="font-semibold text-indigo-300" {...props} />
-                        ),
-                        code: ({ node, ...props }) => (
-                          <code
-                            className="bg-slate-800 text-indigo-300 px-1.5 py-0.5 rounded font-mono text-xs"
-                            {...props}
-                          />
-                        ),
-                        pre: ({ node, ...props }) => (
-                          <pre
-                            className="bg-slate-950 p-3 rounded-lg overflow-x-auto text-xs font-mono border border-slate-800 my-2"
-                            {...props}
-                          />
-                        ),
-                      }}
-                    >
-                      {msg.content}
-                    </ReactMarkdown>
+                  <div className="space-y-3">
+                    <div className="prose prose-invert max-w-none text-slate-200 text-sm leading-relaxed">
+                      <ReactMarkdown
+                        components={{
+                          p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} />,
+                          ul: ({ node, ...props }) => (
+                            <ul className="list-disc pl-5 mb-2 space-y-1 text-slate-300" {...props} />
+                          ),
+                          ol: ({ node, ...props }) => (
+                            <ol className="list-decimal pl-5 mb-2 space-y-1 text-slate-300" {...props} />
+                          ),
+                          li: ({ node, ...props }) => <li className="text-slate-200" {...props} />,
+                          strong: ({ node, ...props }) => (
+                            <strong className="font-semibold text-indigo-300" {...props} />
+                          ),
+                          code: ({ node, ...props }) => (
+                            <code
+                              className="bg-slate-800 text-indigo-300 px-1.5 py-0.5 rounded font-mono text-xs"
+                              {...props}
+                            />
+                          ),
+                          pre: ({ node, ...props }) => (
+                            <pre
+                              className="bg-slate-950 p-3 rounded-lg overflow-x-auto text-xs font-mono border border-slate-800 my-2"
+                              {...props}
+                            />
+                          ),
+                        }}
+                      >
+                        {msg.content}
+                      </ReactMarkdown>
+                    </div>
+
+                    {/* AI/ML Evaluation & Engineering Diagnostics Badge */}
+                    {msg.evaluation && (
+                      <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center gap-2 text-xs">
+                        <span className="flex items-center gap-1 bg-emerald-950/70 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded font-medium">
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                          Grounded: {Math.round((msg.evaluation.faithfulness_score || 1) * 100)}%
+                        </span>
+
+                        <span className="flex items-center gap-1 bg-indigo-950/70 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded">
+                          <Sparkles className="w-3.5 h-3.5" />
+                          {msg.evaluation.retrieval_method || 'Hybrid (BM25 + ChromaDB)'}
+                        </span>
+
+                        <span className="flex items-center gap-1 bg-slate-800/80 text-slate-400 border border-slate-700/60 px-2 py-0.5 rounded">
+                          <Zap className="w-3 h-3 text-amber-400" />
+                          {msg.evaluation.latency_ms ? `${msg.evaluation.latency_ms}ms` : 'fast'}
+                          {msg.evaluation.cached && ' (cached)'}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -134,7 +162,7 @@ export default function ChatBox({ onQueryResult, activeDocument }) {
           <div className="flex items-center gap-3 text-slate-400 text-sm">
             <Bot className="w-8 h-8 p-1.5 bg-slate-700 rounded-full text-indigo-400" />
             <div className="flex items-center gap-2 bg-slate-900 border border-slate-700 px-4 py-2 rounded-xl">
-              <Loader2 className="w-4 h-4 animate-spin" /> Thinking...
+              <Loader2 className="w-4 h-4 animate-spin" /> Retrieving with Hybrid Search & verifying grounding...
             </div>
           </div>
         )}

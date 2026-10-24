@@ -35,3 +35,7 @@ backend/**/__pycache__/
 .vscode/
 .idea/
 *.swp
+
+backend/cache.db
+cache.db
+
